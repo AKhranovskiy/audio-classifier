@@ -9,6 +9,8 @@ pub fn init() -> &'static Classifier {
     &CLASSIFIER
 }
 
+// SHAPE 150x39
+
 impl Classifier {
     pub fn hello(&self) -> PyResult<()> {
         use pyo3::prelude::*;
@@ -24,6 +26,19 @@ impl Classifier {
 
             println!("Hello {}, I'm Python {}", user, version);
             Ok(())
+        })
+    }
+
+    pub fn verify(&self) -> PyResult<f64> {
+        use pyo3::prelude::*;
+
+        Python::with_gil(|py| {
+            let result: f64 =
+                PyModule::from_code(py, include_str!("py/verify.py"), "verify.py", "verify")?
+                    .getattr("verify")?
+                    .call1(("./data.pickle",))?
+                    .extract()?;
+            Ok(result)
         })
     }
 }
