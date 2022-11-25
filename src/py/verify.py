@@ -10,6 +10,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 INPUT_SHAPE = [150, 39, 1]
 CLASSES = 3
 
+
 def verify(data, labels, classes):
     assert data.shape[0] == labels.shape[0]
     assert list(data.shape[1:]) == INPUT_SHAPE
@@ -44,7 +45,7 @@ if __name__ == "__main__":
     mfccs = np.array(mfccs).reshape(-1, *INPUT_SHAPE)
 
     label_len = len(mfccs) // CLASSES
-    
-    labels = np.array([0,1,2]).repeat(label_len)
+
+    labels = np.array([0, 1, 2]).repeat(label_len)
     print(mfccs.shape, labels.shape)
     print("Accuracy ", verify(mfccs, labels, CLASSES))
