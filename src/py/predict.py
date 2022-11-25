@@ -13,7 +13,7 @@ def predict(data):
     model = keras.models.load_model("./model")
 
     print("Predicting {} images.".format(data.shape[0]))
-    return model(data)
+    return model(data).numpy()
 
 
 if __name__ == "__main__":
