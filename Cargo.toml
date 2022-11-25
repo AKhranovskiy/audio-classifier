@@ -3,6 +3,13 @@ name = "audio-classifier"
 version = "0.1.0"
 edition = "2021"
 
+[dependencies]
+ndarray = "0.15.6"
+numpy = "0.17.2"
+serde = "1.0.147"
+serde-pickle = "1.1.1"
+anyhow = "1.0.66"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies.pyo3]
