@@ -1,15 +1,48 @@
 use std::path::Path;
 
+use ndarray::Axis;
+use ndarray_stats::QuantileExt;
+
 fn main() -> anyhow::Result<()> {
     let (data, labels) = prepare_data("./data.pickle")?;
 
-    let result = audio_classifier::init()?
-        .lock()
-        .unwrap()
-        .verify(data, labels)
-        .expect("Python function returned result");
+    let classifier = audio_classifier::init()?;
 
-    println!("Accuracy {:2.02}%", result * 100.0);
+    // Parallel execution is not possible due to Python GIL.
+    let owned_results = data
+        .axis_chunks_iter(Axis(0), 413)
+        .map(|chunk| {
+            classifier
+                .predict(chunk.to_owned())
+                .expect("Python function returned result")
+        })
+        .collect::<Vec<_>>();
+
+    let result = ndarray::concatenate(
+        Axis(0),
+        owned_results
+            .iter()
+            .map(|v| v.view())
+            .collect::<Vec<_>>()
+            .as_ref(),
+    )?;
+
+    let predicted = result
+        .rows()
+        .into_iter()
+        .map(|a| a.argmax())
+        .collect::<Result<Vec<usize>, _>>()?;
+
+    let correct = predicted
+        .iter()
+        .zip(labels.iter())
+        .filter(|(&p, &c)| p as u32 == c)
+        .count();
+
+    println!(
+        "Accuracy {:2.02}%",
+        (correct as f32) / (labels.len() as f32) * 100.0
+    );
 
     Ok(())
 }

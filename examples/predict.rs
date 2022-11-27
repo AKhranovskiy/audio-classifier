@@ -10,7 +10,7 @@ fn main() -> anyhow::Result<()> {
 
     // Parallel execution is not possible due to Python GIL.
     let owned_results = data
-        .axis_chunks_iter(Axis(0), 1003)
+        .axis_chunks_iter(Axis(0), 413)
         .map(|chunk| {
             classifier
                 .predict(chunk.to_owned())
