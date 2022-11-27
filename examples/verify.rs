@@ -3,7 +3,9 @@ use std::path::Path;
 fn main() -> anyhow::Result<()> {
     let (data, labels) = prepare_data("./data.pickle")?;
 
-    let result = audio_classifier::init()
+    let result = audio_classifier::init()?
+        .lock()
+        .unwrap()
         .verify(data, labels)
         .expect("Python function returned result");
 

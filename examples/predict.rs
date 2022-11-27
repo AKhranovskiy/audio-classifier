@@ -6,8 +6,9 @@ use ndarray_stats::QuantileExt;
 fn main() -> anyhow::Result<()> {
     let (data, _labels) = prepare_data("./data.pickle")?;
 
-    let classifier = audio_classifier::init();
+    let classifier = audio_classifier::init()?.lock().unwrap();
 
+    // Parallel execution is not possible due to Python GIL.
     let owned_results = data
         .axis_chunks_iter(Axis(0), 1003)
         .map(|chunk| {

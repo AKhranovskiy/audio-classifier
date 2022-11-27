@@ -1,10 +1,29 @@
+#![feature(once_cell)]
+
+use numpy::IntoPyArray;
+use once_cell::sync::OnceCell;
+use std::sync::Mutex;
+
+use pyo3::types::PyModule;
+use pyo3::{Py, PyAny, Python};
+
 #[non_exhaustive]
-pub struct Classifier;
+pub struct Classifier {
+    predict: Py<PyAny>,
+}
 
-static CLASSIFIER: Classifier = Classifier {};
-
-pub fn init() -> &'static Classifier {
-    &CLASSIFIER
+pub fn init() -> anyhow::Result<&'static Mutex<Classifier>> {
+    static INSTANCE: OnceCell<Mutex<Classifier>> = OnceCell::new();
+    INSTANCE.get_or_try_init(|| {
+        let predict: Py<PyAny> = Python::with_gil(|py| {
+            anyhow::Ok(
+                PyModule::from_code(py, include_str!("py/predict.py"), "predict.py", "predict")?
+                    .getattr("predict")?
+                    .into(),
+            )
+        })?;
+        Ok(Mutex::new(Classifier { predict }))
+    })
 }
 
 // SHAPE 150x39
@@ -15,15 +34,12 @@ impl Classifier {
     }
 
     pub fn predict(&self, data: ndarray::Array4<f64>) -> anyhow::Result<ndarray::Array2<f32>> {
-        use numpy::IntoPyArray;
-        use pyo3::prelude::*;
-
         Python::with_gil(|py| {
-            let result: &numpy::PyArray2<f32> =
-                PyModule::from_code(py, include_str!("py/predict.py"), "predict.py", "predict")?
-                    .getattr("predict")?
-                    .call1((data.into_pyarray(py),))?
-                    .extract()?;
+            let result: &numpy::PyArray2<f32> = self
+                .predict
+                .as_ref(py)
+                .call1((data.into_pyarray(py),))?
+                .extract()?;
             Ok(result.readonly().as_array().to_owned())
         })
     }
@@ -33,9 +49,6 @@ impl Classifier {
         data: ndarray::Array4<f64>,
         labels: ndarray::Array1<u32>,
     ) -> anyhow::Result<f64> {
-        use numpy::IntoPyArray;
-        use pyo3::prelude::*;
-
         Python::with_gil(|py| {
             let result: f64 =
                 PyModule::from_code(py, include_str!("py/verify.py"), "verify.py", "verify")?
