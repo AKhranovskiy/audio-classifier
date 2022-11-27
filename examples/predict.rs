@@ -1,18 +1,39 @@
 use std::path::Path;
 
-use ndarray::s;
+use ndarray::Axis;
 use ndarray_stats::QuantileExt;
-
 
 fn main() -> anyhow::Result<()> {
     let (data, _labels) = prepare_data("./data.pickle")?;
 
-    let result = audio_classifier::init()
-        .predict(data.slice(s![0..10,..,..,..]).to_owned())
-        .expect("Python function returned result");
+    let classifier = audio_classifier::init();
 
-    dbg!(&result);
-    println!("{:?}", result.rows().into_iter().map(|a| a.argmax()).collect::<Result<Vec<usize>, _>>());
+    let owned_results = data
+        .axis_chunks_iter(Axis(0), 1003)
+        .map(|chunk| {
+            classifier
+                .predict(chunk.to_owned())
+                .expect("Python function returned result")
+        })
+        .collect::<Vec<_>>();
+
+    let result = ndarray::concatenate(
+        Axis(0),
+        owned_results
+            .iter()
+            .map(|v| v.view())
+            .collect::<Vec<_>>()
+            .as_ref(),
+    )?;
+
+    println!(
+        "{:?}",
+        result
+            .rows()
+            .into_iter()
+            .map(|a| a.argmax())
+            .collect::<Result<Vec<usize>, _>>()
+    );
 
     Ok(())
 }
