@@ -15,6 +15,9 @@ pub struct Classifier {
 struct Inner {
     model: Py<PyAny>,
     predict: Py<PyAny>,
+    define: Py<PyAny>,
+    train: Py<PyAny>,
+    save: Py<PyAny>,
 }
 
 static SOURCE: &str = include_str!("source.py");
@@ -34,8 +37,22 @@ pub fn init() -> anyhow::Result<&'static Classifier> {
         let predict =
             Python::with_gil(|py| anyhow::Ok(source.as_ref(py).getattr("predict")?.into()))?;
 
+        let define_model =
+            Python::with_gil(|py| anyhow::Ok(source.as_ref(py).getattr("define_model")?.into()))?;
+        let train_model =
+            Python::with_gil(|py| anyhow::Ok(source.as_ref(py).getattr("train_model")?.into()))?;
+
+        let save_model =
+            Python::with_gil(|py| anyhow::Ok(source.as_ref(py).getattr("save_model")?.into()))?;
+
         Ok(Classifier {
-            inner: Mutex::new(Inner { model, predict }),
+            inner: Mutex::new(Inner {
+                model,
+                predict,
+                define: define_model,
+                train: train_model,
+                save: save_model,
+            }),
         })
     })
 }
@@ -43,7 +60,7 @@ pub fn init() -> anyhow::Result<&'static Classifier> {
 impl Classifier {
     pub fn predict(&self, data: ndarray::Array4<f64>) -> anyhow::Result<ndarray::Array2<f32>> {
         let inner = self.inner.lock().unwrap();
-        let Inner { model, predict } = &*inner;
+        let Inner { model, predict, .. } = &*inner;
 
         Python::with_gil(|py| {
             let data = data.into_pyarray(py);
