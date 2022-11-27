@@ -17,42 +17,28 @@ struct Inner {
     predict: Py<PyAny>,
 }
 
-static DEF_LOAD_MODEL: &str = r"
-import tensorflow as tf
-def load_model(path):
-    return tf.keras.models.load_model(path)
-";
-
-static DEF_PREDICT: &str = r"
-def predict(model, data):
-    return model(data).numpy()
-";
+static SOURCE: &str = include_str!("source.py");
 
 pub fn init() -> anyhow::Result<&'static Classifier> {
     static INSTANCE: OnceCell<Classifier> = OnceCell::new();
     INSTANCE.get_or_try_init(|| {
+        let source: Py<PyModule> = Python::with_gil(|py| {
+            anyhow::Ok(PyModule::from_code(py, SOURCE, "source.py", "source")?.into())
+        })?;
+
         let model = Python::with_gil(|py| {
-            let load_model =
-                PyModule::from_code(py, DEF_LOAD_MODEL, "load_model.py", "load_model")?
-                    .getattr("load_model")?;
+            let load_model = source.as_ref(py).getattr("load_model")?;
             anyhow::Ok(load_model.call1(("./model",))?.into())
         })?;
 
-        let predict = Python::with_gil(|py| {
-            anyhow::Ok(
-                PyModule::from_code(py, DEF_PREDICT, "predict.py", "predict")?
-                    .getattr("predict")?
-                    .into(),
-            )
-        })?;
+        let predict =
+            Python::with_gil(|py| anyhow::Ok(source.as_ref(py).getattr("predict")?.into()))?;
 
         Ok(Classifier {
             inner: Mutex::new(Inner { model, predict }),
         })
     })
 }
-
-// SHAPE 150x39
 
 impl Classifier {
     pub fn predict(&self, data: ndarray::Array4<f64>) -> anyhow::Result<ndarray::Array2<f32>> {
