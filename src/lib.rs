@@ -12,6 +12,7 @@ pub struct Classifier {
     inner: Mutex<Inner>,
 }
 
+#[allow(dead_code)]
 struct Inner {
     model: Py<PyAny>,
     predict: Py<PyAny>,
@@ -21,39 +22,29 @@ struct Inner {
 }
 
 static SOURCE: &str = include_str!("source.py");
+static MODEL_PATH: &str = "./model";
 
 pub fn init() -> anyhow::Result<&'static Classifier> {
     static INSTANCE: OnceCell<Classifier> = OnceCell::new();
     INSTANCE.get_or_try_init(|| {
-        let source: Py<PyModule> = Python::with_gil(|py| {
-            anyhow::Ok(PyModule::from_code(py, SOURCE, "source.py", "source")?.into())
-        })?;
+        let inner = Python::with_gil(|py| {
+            let source = PyModule::from_code(py, SOURCE, "source.py", "source")?;
 
-        let model = Python::with_gil(|py| {
-            let load_model = source.as_ref(py).getattr("load_model")?;
-            anyhow::Ok(load_model.call1(("./model",))?.into())
-        })?;
-
-        let predict =
-            Python::with_gil(|py| anyhow::Ok(source.as_ref(py).getattr("predict")?.into()))?;
-
-        let define_model =
-            Python::with_gil(|py| anyhow::Ok(source.as_ref(py).getattr("define_model")?.into()))?;
-        let train_model =
-            Python::with_gil(|py| anyhow::Ok(source.as_ref(py).getattr("train_model")?.into()))?;
-
-        let save_model =
-            Python::with_gil(|py| anyhow::Ok(source.as_ref(py).getattr("save_model")?.into()))?;
-
-        Ok(Classifier {
-            inner: Mutex::new(Inner {
+            let model = source.getattr("load_model")?.call1((MODEL_PATH,))?.into();
+            let predict = source.getattr("predict")?.into();
+            let define = source.getattr("define_model")?.into();
+            let train = source.getattr("train_model")?.into();
+            let save = source.getattr("save_model")?.into();
+            anyhow::Ok(Inner {
                 model,
                 predict,
-                define: define_model,
-                train: train_model,
-                save: save_model,
-            }),
-        })
+                define,
+                train,
+                save,
+            })
+        })?;
+        let inner = Mutex::new(inner);
+        Ok(Classifier { inner })
     })
 }
 
