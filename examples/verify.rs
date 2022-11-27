@@ -1,12 +1,13 @@
 use std::path::Path;
 
+use audio_classifier::Classifier;
 use ndarray::Axis;
 use ndarray_stats::QuantileExt;
 
 fn main() -> anyhow::Result<()> {
     let (data, labels) = prepare_data("./data.pickle")?;
 
-    let classifier = audio_classifier::init()?;
+    let classifier = Classifier::from_file("./model")?;
 
     // Parallel execution is not possible due to Python GIL.
     let owned_results = data
