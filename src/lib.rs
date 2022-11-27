@@ -9,20 +9,22 @@ use pyo3::{Py, PyAny, Python};
 
 #[non_exhaustive]
 pub struct Classifier {
-    predict: Py<PyAny>,
+    // predict contains model loading code so it is loaded every call.
+    // Load model separately.
+    predict: Mutex<Py<PyAny>>,
 }
 
-pub fn init() -> anyhow::Result<&'static Mutex<Classifier>> {
-    static INSTANCE: OnceCell<Mutex<Classifier>> = OnceCell::new();
+pub fn init() -> anyhow::Result<&'static Classifier> {
+    static INSTANCE: OnceCell<Classifier> = OnceCell::new();
     INSTANCE.get_or_try_init(|| {
-        let predict: Py<PyAny> = Python::with_gil(|py| {
+        let predict = Mutex::new(Python::with_gil(|py| {
             anyhow::Ok(
                 PyModule::from_code(py, include_str!("py/predict.py"), "predict.py", "predict")?
                     .getattr("predict")?
                     .into(),
             )
-        })?;
-        Ok(Mutex::new(Classifier { predict }))
+        })?);
+        Ok(Classifier { predict })
     })
 }
 
@@ -34,9 +36,10 @@ impl Classifier {
     }
 
     pub fn predict(&self, data: ndarray::Array4<f64>) -> anyhow::Result<ndarray::Array2<f32>> {
+        let predict = self.predict.lock().unwrap();
+
         Python::with_gil(|py| {
-            let result: &numpy::PyArray2<f32> = self
-                .predict
+            let result: &numpy::PyArray2<f32> = predict
                 .as_ref(py)
                 .call1((data.into_pyarray(py),))?
                 .extract()?;

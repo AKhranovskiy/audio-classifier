@@ -6,7 +6,7 @@ use ndarray_stats::QuantileExt;
 fn main() -> anyhow::Result<()> {
     let (data, _labels) = prepare_data("./data.pickle")?;
 
-    let classifier = audio_classifier::init()?.lock().unwrap();
+    let classifier = audio_classifier::init()?;
 
     // Parallel execution is not possible due to Python GIL.
     let owned_results = data
