@@ -49,9 +49,16 @@ impl PyVTable {
         Python::with_gil(|py| anyhow::Ok(Self::get().load.as_ref(py).call1((path,))?.into()))
     }
 
-    pub(crate) fn predict(model: &PyModel, data: Data) -> anyhow::Result<PredictedLabels> {
+    pub(crate) fn save(model: &PyModel, path: &str) -> anyhow::Result<()> {
         Python::with_gil(|py| {
-            let data = data.into_pyarray(py);
+            Self::get().save.as_ref(py).call1((model, path))?;
+            anyhow::Ok(())
+        })
+    }
+
+    pub(crate) fn predict(model: &PyModel, data: &Data) -> anyhow::Result<PredictedLabels> {
+        Python::with_gil(|py| {
+            let data = data.clone().into_pyarray(py);
             let model = model.as_ref(py);
             let pyarray: &numpy::PyArray2<f32> = Self::get()
                 .predict
@@ -62,14 +69,19 @@ impl PyVTable {
         })
     }
 
-    pub(crate) fn save(model: &PyModel, path: &str) -> anyhow::Result<()> {
+    pub(crate) fn train(model: &PyModel, data: &Data, labels: &Labels) -> anyhow::Result<PyModel> {
         Python::with_gil(|py| {
-            Self::get().save.as_ref(py).call1((model, path))?;
-            anyhow::Ok(())
+            anyhow::Ok(
+                Self::get()
+                    .train
+                    .as_ref(py)
+                    .call1((
+                        model,
+                        data.clone().into_pyarray(py),
+                        labels.clone().into_pyarray(py),
+                    ))?
+                    .extract()?,
+            )
         })
-    }
-
-    pub(crate) fn train(_model: &PyModel, _data: Data, _labels: Labels) -> anyhow::Result<f32> {
-        todo!()
     }
 }

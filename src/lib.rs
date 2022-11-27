@@ -3,6 +3,8 @@ mod types;
 
 use std::sync::Mutex;
 
+use ndarray_stats::QuantileExt;
+
 use self::pyvtable::PyVTable;
 use self::types::{Data, Labels, PredictedLabels, PyModel};
 
@@ -24,18 +26,36 @@ impl Classifier {
         })
     }
 
-    pub fn predict(&self, data: Data) -> anyhow::Result<PredictedLabels> {
+    pub fn predict(&self, data: &Data) -> anyhow::Result<PredictedLabels> {
         let model = self.model.lock().unwrap();
-        PyVTable::predict(&model, data)
+        PyVTable::predict(&model, &data)
     }
 
-    pub fn train(&self, data: Data, labels: Labels) -> anyhow::Result<f32> {
+    pub fn train(&mut self, data: &Data, labels: &Labels) -> anyhow::Result<f32> {
         let model = self.model.lock().unwrap();
-        PyVTable::train(&model, data, labels)
+        let new_model = PyVTable::train(&model, &data, &labels)?;
+        let predicted = PyVTable::predict(&new_model, &data)?;
+        verify(&predicted, &labels)
     }
 
     pub fn save(&self, path: &str) -> anyhow::Result<()> {
         let model = self.model.lock().unwrap();
         PyVTable::save(&model, path)
     }
+}
+
+pub fn verify(predicted: &PredictedLabels, valid: &Labels) -> anyhow::Result<f32> {
+    let labels = predicted
+        .rows()
+        .into_iter()
+        .map(|a| a.argmax().map(|n| n as u32))
+        .collect::<Result<Labels, _>>()?;
+
+    let correct = labels
+        .iter()
+        .zip(valid.iter())
+        .filter(|(p, c)| p == c)
+        .count();
+
+    Ok((correct as f32) / (labels.len() as f32) * 100.0)
 }
