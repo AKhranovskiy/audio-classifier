@@ -7,7 +7,7 @@ INPUT_SHAPE = [150, 39, 1]
 CLASSES = 3
 TEST_SIZE = 0.25
 VALIDATION_SIZE = 0.2
-EPOCHS = 40
+EPOCHS = 100
 BATCH = 32
 
 
@@ -47,7 +47,7 @@ def save_model(model, name):
 
 
 def train_model(model, data, labels):
-    labels = tf.keras.utils.to_categorical(labels, num_classes=CLASSES)
+    labels = keras.utils.to_categorical(labels, num_classes=CLASSES)
     x_train, x_test, y_train, y_test = train_test_split(
         data, labels, test_size=TEST_SIZE
     )

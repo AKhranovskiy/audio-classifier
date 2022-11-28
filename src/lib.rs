@@ -31,13 +31,10 @@ impl Classifier {
         PyVTable::predict(&model, data)
     }
 
-    pub fn train(&mut self, data: &Data, labels: &Labels) -> anyhow::Result<f32> {
-        let predicted = {
-            let mut model = self.model.lock().unwrap();
-            *model = PyVTable::train(&model, data, labels)?;
-            PyVTable::predict(&model, data)?
-        };
-        verify(&predicted, labels)
+    pub fn train(&mut self, data: &Data, labels: &Labels) -> anyhow::Result<()> {
+        let mut model = self.model.lock().unwrap();
+        *model = PyVTable::train(&model, data, labels)?;
+        Ok(())
     }
 
     pub fn save(&self, path: &str) -> anyhow::Result<()> {
