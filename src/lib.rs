@@ -28,14 +28,16 @@ impl Classifier {
 
     pub fn predict(&self, data: &Data) -> anyhow::Result<PredictedLabels> {
         let model = self.model.lock().unwrap();
-        PyVTable::predict(&model, &data)
+        PyVTable::predict(&model, data)
     }
 
     pub fn train(&mut self, data: &Data, labels: &Labels) -> anyhow::Result<f32> {
-        let model = self.model.lock().unwrap();
-        let new_model = PyVTable::train(&model, &data, &labels)?;
-        let predicted = PyVTable::predict(&new_model, &data)?;
-        verify(&predicted, &labels)
+        let predicted = {
+            let mut model = self.model.lock().unwrap();
+            *model = PyVTable::train(&model, data, labels)?;
+            PyVTable::predict(&model, data)?
+        };
+        verify(&predicted, labels)
     }
 
     pub fn save(&self, path: &str) -> anyhow::Result<()> {
